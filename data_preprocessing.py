@@ -16,13 +16,7 @@ import shutil
 import traceback
 from unittest.mock import patch
 
-# Mock for statsapi.get function
-def mock_statsapi_get(endpoint, params=None):
-    # Add mock implementation here
-    return {}  # Return an empty dictionary as a placeholder
 
-# Apply the mock to statsapi.get
-statsapi.get = mock_statsapi_get
 
 # Configure logging
 log_file = 'data_preprocessing.log'
@@ -51,12 +45,21 @@ api_file_handler = RotatingFileHandler('api_requests.log', maxBytes=10*1024*1024
 api_file_handler.setFormatter(log_formatter)
 api_logger.addHandler(api_file_handler)
 
+# Create a specific logger for player stats
+player_stats_logger = logging.getLogger('player_stats')
+player_stats_logger.setLevel(logging.DEBUG)
+player_stats_file_handler = RotatingFileHandler('player_stats.log', maxBytes=10*1024*1024, backupCount=5)
+player_stats_file_handler.setFormatter(log_formatter)
+player_stats_logger.addHandler(player_stats_file_handler)
+
 logging.info(f"Logging configured. Debug logs will be written to {os.path.abspath(log_file)}")
 logging.info(f"API request logs will be written to {os.path.abspath('api_requests.log')}")
+logging.info(f"Player stats logs will be written to {os.path.abspath('player_stats.log')}")
 
 # Add a test log entry
 logging.debug("This is a test log entry to verify logging functionality")
 api_logger.debug("This is a test log entry for API requests")
+player_stats_logger.debug("This is a test log entry for player stats")
 
 def retry_decorator(max_retries=5, initial_delay=1, backoff=2):
     def decorator(func):
@@ -170,7 +173,21 @@ def load_mlb_data(years=None, chunk_size=10000):
                     os.remove(cache_file)
                 return None
 
-        logging.info(f"No cached data found. Starting fresh data retrieval for year {year}")
+        # If no cached data found, log this information
+        logging.info(f"No cached data found for {year}. Starting fresh data retrieval.")
+
+        # Add more detailed logging for 2024
+        if year == 2024:
+            logging.info("Processing data for 2024. This is the current year and may have limited data.")
+            logging.info("Checking if the season has started...")
+            current_date = datetime.now()
+            season_start = datetime(2024, 3, 28)  # Approximate start date for 2024 MLB season
+            if current_date < season_start:
+                logging.warning(f"Current date ({current_date}) is before the 2024 season start ({season_start}). No data may be available yet.")
+            else:
+                logging.info(f"2024 season has started. Data should be available from {season_start} to {current_date}")
+
+        logging.info(f"Starting fresh data retrieval for year {year}")
 
         # Global dictionary to store information about skipped games
         skipped_games_info = {}
@@ -179,7 +196,7 @@ def load_mlb_data(years=None, chunk_size=10000):
         def fetch_month_data(month):
             month_data = []
             skipped_games = []
-            logging.info(f"Fetching data for {year}-{month:02d}")
+            logging.info(f"Starting data fetch for {year}-{month:02d}")
 
             start_date = datetime(year, month, 1)
             _, last_day = monthrange(year, month)
@@ -193,6 +210,8 @@ def load_mlb_data(years=None, chunk_size=10000):
                 logging.info(f"Fetching schedule for {year}-{month:02d}")
                 games = statsapi.schedule(start_date=start_date.strftime("%Y-%m-%d"),
                                           end_date=end_date.strftime("%Y-%m-%d"))
+
+                logging.debug(f"API response for schedule: {games}")
 
                 if not games:
                     logging.warning(f"No games scheduled for {year}-{month:02d}")
@@ -213,15 +232,31 @@ def load_mlb_data(years=None, chunk_size=10000):
                         logging.info(f"Fetching detailed data for game {game_id}")
                         game_data = statsapi.get('game', {'gamePk': game_id})
 
+                        logging.debug(f"API response for game {game_id}: {game_data}")
+
+                        if not game_data:
+                            logging.warning(f"No data returned for game {game_id}. Skipping this game.")
+                            continue
+
+                        if 'gameData' not in game_data:
+                            logging.warning(f"'gameData' missing for game {game_id}. Skipping this game.")
+                            continue
+
+                        if 'liveData' not in game_data:
+                            logging.warning(f"'liveData' missing for game {game_id}. Skipping this game.")
+                            continue
+
                         # Initialize players_data list
                         players_data = []
 
                         # Extract relevant information from game_data
                         home_pitcher_id = None
                         away_pitcher_id = None
-                        players_data = []
                         for team in ['home', 'away']:
                             opponent_team = 'away' if team == 'home' else 'home'
+                            if 'players' not in game_data['gameData']:
+                                logging.warning(f"No player data found for game {game_id}. Skipping this game.")
+                                continue
                             for player in game_data['gameData']['players'].values():
                                 try:
                                     player_data = {
@@ -240,9 +275,9 @@ def load_mlb_data(years=None, chunk_size=10000):
                                         'jersey_number': player.get('primaryNumber', ''),
                                         'mlb_debut': player.get('mlbDebutDate', ''),
                                         'opponent_team': game_data['gameData']['teams'][opponent_team]['name'],
-                                        'venue': game_data['gameData']['venue']['name'],
-                                        'game_type': game['game_type'],
-                                        'game_date': game['game_date'],
+                                        'venue': game_data['gameData']['venue'].get('name', ''),
+                                        'game_type': game.get('game_type', ''),
+                                        'game_date': game.get('game_date', ''),
                                         'game_time': game.get('game_time', ''),
                                         'home_team': game_data['gameData']['teams']['home']['name'],
                                         'away_team': game_data['gameData']['teams']['away']['name'],
@@ -255,10 +290,43 @@ def load_mlb_data(years=None, chunk_size=10000):
                                         'game_attendance': game_data['gameData'].get('attendance', np.nan),
                                         'game_duration': game_data['gameData'].get('gameDuration', np.nan),
                                         'game_daynight': game_data['gameData'].get('dayNight', ''),
-                                        'earned_runs': game_data['liveData']['boxscore']['teams'][team]['teamStats']['pitching'].get('earnedRuns', np.nan),
-                                        'innings_pitched': game_data['liveData']['boxscore']['teams'][team]['teamStats']['pitching'].get('inningsPitched', np.nan),
-                                        'runs': game_data['liveData']['boxscore']['teams'][team]['teamStats']['batting'].get('runs', np.nan),
                                     }
+
+                                    # Fetch player stats using statsapi.player_stat_data
+                                    try:
+                                        player_stats_logger.info(f"Fetching stats for player {player_data['player_id']}")
+                                        player_stats = statsapi.player_stat_data(player_data['player_id'], group="hitting", type="season")
+                                        player_stats_logger.debug(f"API response for player {player_data['player_id']}: {player_stats}")
+
+                                        if player_stats['stats']:
+                                            hitting_stats = player_stats['stats'][0]['stats']
+                                            player_data.update({
+                                                'batting_average': hitting_stats.get('avg', 0.0),
+                                                'on_base_percentage': hitting_stats.get('obp', 0.0),
+                                                'slugging_percentage': hitting_stats.get('slg', 0.0),
+                                                'home_runs': hitting_stats.get('homeRuns', 0),
+                                                'runs_batted_in': hitting_stats.get('rbi', 0),
+                                            })
+                                            player_stats_logger.info(f"Successfully retrieved hitting stats for player {player_data['player_id']}")
+                                        else:
+                                            player_stats_logger.warning(f"No hitting stats found for player {player_data['player_id']}. API response: {player_stats}")
+                                            player_data.update({
+                                                'batting_average': 0.0,
+                                                'on_base_percentage': 0.0,
+                                                'slugging_percentage': 0.0,
+                                                'home_runs': 0,
+                                                'runs_batted_in': 0,
+                                            })
+                                    except Exception as e:
+                                        player_stats_logger.error(f"Error fetching stats for player {player_data['player_id']}: {str(e)}")
+                                        player_stats_logger.error(f"Traceback: {traceback.format_exc()}")
+                                        player_data.update({
+                                            'batting_average': 0.0,
+                                            'on_base_percentage': 0.0,
+                                            'slugging_percentage': 0.0,
+                                            'home_runs': 0,
+                                            'runs_batted_in': 0,
+                                        })
 
                                     if player_data['position'] == 'P':
                                         if team == 'home':
@@ -274,6 +342,7 @@ def load_mlb_data(years=None, chunk_size=10000):
 
                                 except Exception as e:
                                     logging.error(f"Error processing player data for game {game_id}: {str(e)}")
+                                    logging.debug(f"Player data causing error: {player}")
                                     continue  # Skip this player and continue with the next one
 
                         # Verify and correct opponent_pitcher_id assignments
@@ -298,6 +367,7 @@ def load_mlb_data(years=None, chunk_size=10000):
                                                 player_data[f'{stat_type}_{stat}'] = value
 
                         logging.info(f"Successfully processed game {game_id}")
+                        logging.debug(f"Number of players processed for game {game_id}: {len(players_data)}")
 
                         # Implement rate limiting
                         time.sleep(0.3)  # Sleep for 0.3 seconds between API calls
@@ -313,6 +383,7 @@ def load_mlb_data(years=None, chunk_size=10000):
                     except Exception as game_exc:
                         error_msg = f"Unexpected error fetching data for game {game_id}: {game_exc}"
                         logging.error(error_msg)
+                        logging.debug(f"Traceback: {traceback.format_exc()}")
                         skipped_games.append(game_id)
 
                     if len(skipped_games) >= 5:  # If 5 consecutive games are skipped, break the loop
@@ -322,6 +393,7 @@ def load_mlb_data(years=None, chunk_size=10000):
             except Exception as exc:
                 error_msg = f"Error fetching schedule for {year}-{month:02d}: {exc}"
                 logging.error(error_msg)
+                logging.debug(f"Traceback: {traceback.format_exc()}")
 
             if skipped_games:
                 logging.warning(f"Skipped {len(skipped_games)} games for {year}-{month:02d}")
@@ -346,6 +418,7 @@ def load_mlb_data(years=None, chunk_size=10000):
                     if month_data:
                         year_data.extend(month_data)
                         logging.info(f"Completed data retrieval for {year}-{month:02d}")
+                        logging.debug(f"Number of records retrieved for {year}-{month:02d}: {len(month_data)}")
                         if skipped_games:
                             logging.warning(f"Skipped {len(skipped_games)} games for {year}-{month:02d}")
                     if too_many_errors:
@@ -357,6 +430,7 @@ def load_mlb_data(years=None, chunk_size=10000):
                 except Exception as exc:
                     failed_periods.append(month)
                     logging.error(f"Error processing data for {year}-{month:02d}: {exc}")
+                    logging.debug(f"Traceback: {traceback.format_exc()}")
 
         if failed_periods:
             logging.warning(f"Failed to retrieve data for {len(failed_periods)} months in {year}: {failed_periods}")
@@ -365,12 +439,14 @@ def load_mlb_data(years=None, chunk_size=10000):
         logging.info(f"Converting collected data to DataFrame for {year}")
         df = pd.DataFrame(year_data)
         logging.info(f"DataFrame created with {len(df)} rows containing player data for {year}.")
+        logging.debug(f"DataFrame columns: {df.columns.tolist()}")
 
         # Check for the presence of 'earned_runs',
         # 'innings_pitched', and 'runs' columns after DataFrame creation
         for col in ['earned_runs', 'innings_pitched', 'runs']:
             if col in df.columns:
                 logging.info(f"'{col}' column is present in the initial DataFrame for {year}")
+                logging.debug(f"Sample values for '{col}': {df[col].head()}")
             else:
                 logging.warning(f"'{col}' column is missing from the initial DataFrame for {year}")
 
@@ -452,7 +528,11 @@ def load_mlb_data(years=None, chunk_size=10000):
             year_data = process_year_data(year)
             if year_data is not None:
                 for i in range(0, len(year_data), chunk_size):
-                    yield year_data.iloc[i:i+chunk_size]
+                    chunk = year_data.iloc[i:i+chunk_size]
+                    logging.info(f"Yielding chunk of size {len(chunk)} for year {year}")
+                    yield chunk
+            else:
+                logging.warning(f"No data available for year {year}")
 
     logging.info("Exiting load_mlb_data function")
     return data_generator()
