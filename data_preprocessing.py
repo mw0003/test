@@ -295,27 +295,54 @@ def load_mlb_data(years=None, chunk_size=10000):
                                     # Fetch player stats using statsapi.player_stat_data
                                     try:
                                         player_stats_logger.info(f"Fetching stats for player {player_data['player_id']}")
-                                        player_stats = statsapi.player_stat_data(player_data['player_id'], group="hitting", type="season")
+                                        if player_data['position'] == 'P':
+                                            player_stats = statsapi.player_stat_data(player_data['player_id'], group="pitching", type="season")
+                                        else:
+                                            player_stats = statsapi.player_stat_data(player_data['player_id'], group="hitting", type="season")
                                         player_stats_logger.debug(f"API response for player {player_data['player_id']}: {player_stats}")
 
                                         if player_stats['stats']:
-                                            hitting_stats = player_stats['stats'][0]['stats']
-                                            player_data.update({
-                                                'batting_average': hitting_stats.get('avg', 0.0),
-                                                'on_base_percentage': hitting_stats.get('obp', 0.0),
-                                                'slugging_percentage': hitting_stats.get('slg', 0.0),
-                                                'home_runs': hitting_stats.get('homeRuns', 0),
-                                                'runs_batted_in': hitting_stats.get('rbi', 0),
-                                            })
-                                            player_stats_logger.info(f"Successfully retrieved hitting stats for player {player_data['player_id']}")
+                                            stats = player_stats['stats'][0]['stats']
+                                            if player_data['position'] == 'P':
+                                                player_data.update({
+                                                    'earned_run_average': stats.get('era', 0.0),
+                                                    'walks_and_hits_per_inning_pitched': stats.get('whip', 0.0),
+                                                    'strikeouts_per_nine_innings': stats.get('strikeoutsPer9Inn', 0.0),
+                                                    'walks_per_nine_innings': stats.get('walksPer9Inn', 0.0),
+                                                    'home_runs_per_nine_innings': stats.get('homeRunsPer9', 0.0),
+                                                    'batting_average': 0.0,
+                                                    'on_base_percentage': 0.0,
+                                                    'slugging_percentage': 0.0,
+                                                    'home_runs': 0,
+                                                    'runs_batted_in': 0,
+                                                })
+                                            else:
+                                                player_data.update({
+                                                    'batting_average': stats.get('avg', 0.0),
+                                                    'on_base_percentage': stats.get('obp', 0.0),
+                                                    'slugging_percentage': stats.get('slg', 0.0),
+                                                    'home_runs': stats.get('homeRuns', 0),
+                                                    'runs_batted_in': stats.get('rbi', 0),
+                                                    'earned_run_average': 0.0,
+                                                    'walks_and_hits_per_inning_pitched': 0.0,
+                                                    'strikeouts_per_nine_innings': 0.0,
+                                                    'walks_per_nine_innings': 0.0,
+                                                    'home_runs_per_nine_innings': 0.0,
+                                                })
+                                            player_stats_logger.info(f"Successfully retrieved stats for player {player_data['player_id']}")
                                         else:
-                                            player_stats_logger.warning(f"No hitting stats found for player {player_data['player_id']}. API response: {player_stats}")
+                                            player_stats_logger.warning(f"No stats found for player {player_data['player_id']}. API response: {player_stats}")
                                             player_data.update({
                                                 'batting_average': 0.0,
                                                 'on_base_percentage': 0.0,
                                                 'slugging_percentage': 0.0,
                                                 'home_runs': 0,
                                                 'runs_batted_in': 0,
+                                                'earned_run_average': 0.0,
+                                                'walks_and_hits_per_inning_pitched': 0.0,
+                                                'strikeouts_per_nine_innings': 0.0,
+                                                'walks_per_nine_innings': 0.0,
+                                                'home_runs_per_nine_innings': 0.0,
                                             })
                                     except Exception as e:
                                         player_stats_logger.error(f"Error fetching stats for player {player_data['player_id']}: {str(e)}")
@@ -326,6 +353,11 @@ def load_mlb_data(years=None, chunk_size=10000):
                                             'slugging_percentage': 0.0,
                                             'home_runs': 0,
                                             'runs_batted_in': 0,
+                                            'earned_run_average': 0.0,
+                                            'walks_and_hits_per_inning_pitched': 0.0,
+                                            'strikeouts_per_nine_innings': 0.0,
+                                            'walks_per_nine_innings': 0.0,
+                                            'home_runs_per_nine_innings': 0.0,
                                         })
 
                                     if player_data['position'] == 'P':

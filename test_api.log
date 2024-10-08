@@ -1,0 +1,26 @@
+2024-10-06 21:49:05,483 - INFO - Fetching schedule from 2024-09-29 to 2024-10-06
+2024-10-06 21:49:05,483 - DEBUG - URL: https://statsapi.mlb.com/api/{ver}/schedule
+2024-10-06 21:49:05,484 - DEBUG - Found query param: startDate
+2024-10-06 21:49:05,484 - DEBUG - Found query param: endDate
+2024-10-06 21:49:05,484 - DEBUG - Found query param: sportId
+2024-10-06 21:49:05,484 - DEBUG - Found query param: hydrate
+2024-10-06 21:49:05,484 - DEBUG - path_params: {}
+2024-10-06 21:49:05,484 - DEBUG - query_params: {'startDate': '2024-09-29', 'endDate': '2024-10-06', 'sportId': '1', 'hydrate': 'decisions,probablePitcher(note),linescore,broadcasts,game(content(media(epg))),seriesStatus'}
+2024-10-06 21:49:05,484 - DEBUG - Replacing {ver} with default: v1.
+2024-10-06 21:49:05,484 - DEBUG - URL: https://statsapi.mlb.com/api/v1/schedule
+2024-10-06 21:49:05,484 - DEBUG - Adding query parameter startDate=2024-09-29
+2024-10-06 21:49:05,484 - DEBUG - URL: https://statsapi.mlb.com/api/v1/schedule?startDate=2024-09-29
+2024-10-06 21:49:05,484 - DEBUG - Adding query parameter endDate=2024-10-06
+2024-10-06 21:49:05,485 - DEBUG - URL: https://statsapi.mlb.com/api/v1/schedule?startDate=2024-09-29&endDate=2024-10-06
+2024-10-06 21:49:05,485 - DEBUG - Adding query parameter sportId=1
+2024-10-06 21:49:05,485 - DEBUG - URL: https://statsapi.mlb.com/api/v1/schedule?startDate=2024-09-29&endDate=2024-10-06&sportId=1
+2024-10-06 21:49:05,485 - DEBUG - Adding query parameter hydrate=decisions,probablePitcher(note),linescore,broadcasts,game(content(media(epg))),seriesStatus
+2024-10-06 21:49:05,485 - DEBUG - URL: https://statsapi.mlb.com/api/v1/schedule?startDate=2024-09-29&endDate=2024-10-06&sportId=1&hydrate=decisions,probablePitcher(note),linescore,broadcasts,game(content(media(epg))),seriesStatus
+2024-10-06 21:49:05,488 - DEBUG - Starting new HTTPS connection (1): statsapi.mlb.com:443
+2024-10-06 21:49:05,947 - DEBUG - https://statsapi.mlb.com:443 "GET /api/v1/schedule?startDate=2024-09-29&endDate=2024-10-06&sportId=1&hydrate=decisions,probablePitcher(note),linescore,broadcasts,game(content(media(epg))),seriesStatus HTTP/11" 200 None
+2024-10-06 21:49:06,002 - INFO - Successfully retrieved 32 games
+2024-10-06 21:49:06,002 - DEBUG - Game ID: 745282, Date: 2024-09-29, Teams: St. Louis Cardinals at San Francisco Giants
+2024-10-06 21:49:06,002 - DEBUG - Game ID: 746901, Date: 2024-09-29, Teams: Tampa Bay Rays at Boston Red Sox
+2024-10-06 21:49:06,002 - DEBUG - Game ID: 744798, Date: 2024-09-29, Teams: Philadelphia Phillies at Washington Nationals
+2024-10-06 21:49:06,002 - DEBUG - Game ID: 745686, Date: 2024-09-29, Teams: Pittsburgh Pirates at New York Yankees
+2024-10-06 21:49:06,003 - DEBUG - Game ID: 746174, Date: 2024-09-29, Teams: Texas Rangers at Los Angeles Angels
